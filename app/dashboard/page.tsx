@@ -2,7 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { useContext, useState } from 'react';
-import { AssistantContext } from './layout';
+import { AssistantContext } from '../context/AssistantContext';
 import { ConfigureSettings } from '../components/ConfigureSettings';
 import { PerformanceMetrics } from '../components/PerformanceMetrics';
 import { SelectAssistants } from '../components/SelectAssistants';
@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('content');
 
   return (
-    <div className="max-w-7xl mx-auto">
+    <div className="max-w-7xl mx-auto bg-green-500">
       <SelectAssistants 
         selectedWorkflow={selectedWorkflow}
         setSelectedWorkflow={setSelectedWorkflow}

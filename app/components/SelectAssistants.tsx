@@ -7,7 +7,7 @@ interface SelectAssistantsProps {
 
 export function SelectAssistants({ selectedWorkflow, setSelectedWorkflow }: SelectAssistantsProps) {
   return (
-    <section className="bg-[#1a1a1a] text-white p-8  rounded-b-2xl mb-8">
+    <section className="bg-[#1a1a1a] text-white p-8  rounded-b-2xl mb-8 w-full ">
       <h2 className="text-3xl font-semibold text-center pt-16 mb-8 max-w-[400px] mx-auto">Select and Configure Assistants</h2>
       <p className="text-center mt-2 mb-4">Organize assistants and agents for your workflows</p>
       
