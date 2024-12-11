@@ -18,6 +18,22 @@ export default function Home() {
             Chat Center
           </a>
         </div>
+        
+        <div className="flex gap-4 mt-4">
+          <a
+            href="/login"
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            Login
+          </a>
+          <span>|</span>
+          <a
+            href="/register"
+            className="text-blue-600 hover:text-blue-800 underline"
+          >
+            Register
+          </a>
+        </div>
       </main>
     </div>
   );
