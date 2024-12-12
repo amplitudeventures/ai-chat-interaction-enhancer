@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const [selectedWorkflow, setSelectedWorkflow] = useState<string>('content');
 
   return (
-    <div className="max-w-7xl mx-auto bg-green-500">
+    <div className="max-w-7xl mx-auto ">
       <SelectAssistants 
         selectedWorkflow={selectedWorkflow}
         setSelectedWorkflow={setSelectedWorkflow}
