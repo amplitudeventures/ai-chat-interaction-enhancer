@@ -1,5 +1,5 @@
 import React from 'react';
-import { AIEntity, getStatusBadgeStyles } from '@/lib/data/ai-entities';
+import { AIEntity, getStatusBadgeStyles, AIEntityStatus } from '@/lib/data/ai-entities';
 
 interface AIEntityCardProps {
   entity: AIEntity;
@@ -8,7 +8,7 @@ interface AIEntityCardProps {
 }
 
 const AIEntityCard = ({ entity, className = '', onClick }: AIEntityCardProps) => {
-  const statusStyles = getStatusBadgeStyles(entity.status);
+  const statusStyles = getStatusBadgeStyles(entity.status ?? AIEntityStatus.INACTIVE);
 
   return (
     <div 

@@ -49,6 +49,7 @@ export function ParentComponent() {
       <AvailableAssistants 
         activeAssistants={droppedAssistants} 
         onDrop={handleDrop}
+        onDragStart={() => {}}
         onSave={handleSave}
       />
     </div>

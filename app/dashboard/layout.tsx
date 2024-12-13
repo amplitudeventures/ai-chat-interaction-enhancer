@@ -2,24 +2,32 @@
 
 import { useState } from 'react';
 import { SessionProvider, useSession } from 'next-auth/react';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay } from '@dnd-kit/core';
 import { AssistantContext } from '../context/AssistantContext';
-import { assistants as initialAssistants } from '@/lib/data/ai-entities';
-import { type AIEntity } from '@/lib/data/ai-entities';
+import { type AIEntity, assistants, agents } from '@/lib/data/ai-entities';
 import Sidebar from '../components/Sidebar';
 import { Footer } from '../components/Footer';
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
   const [activeAssistants, setActiveAssistants] = useState<AIEntity[]>([]);
+  const [draggedEntity, setDraggedEntity] = useState<AIEntity | null>(null);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const entity = [...assistants, ...agents].find(e => e.id === event.active.id);
+    if (entity) {
+      setDraggedEntity(entity);
+    }
+  };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    setDraggedEntity(null);
     const { active, over } = event;
     
     if (over && over.id === 'workspace') {
-      const draggedAssistant = initialAssistants.find(a => a.id === active.id);
-      if (draggedAssistant && !activeAssistants.some(a => a.id === draggedAssistant.id)) {
-        setActiveAssistants([...activeAssistants, draggedAssistant]);
+      const entity = [...assistants, ...agents].find(e => e.id === active.id);
+      if (entity && !activeAssistants.some(a => a.id === entity.id)) {
+        setActiveAssistants([...activeAssistants, entity]);
       }
     }
   };
@@ -34,11 +42,14 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <DndContext onDragEnd={handleDragEnd}>
+    <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <AssistantContext.Provider value={{ activeAssistants, setActiveAssistants }}>
         <div className="min-h-screen flex">
-          <div className="fixed left-0 top-0 h-screen w-64">
-            <Sidebar assistants={initialAssistants} setAssistants={setActiveAssistants} />
+          <div className="fixed left-0 top-0 h-screen w-64 overflow-x-hidden">
+            <Sidebar 
+              setAssistants={setActiveAssistants} 
+              activeAssistants={activeAssistants} 
+            />
           </div>
           
           <div className="ml-64 flex-1 flex flex-col">
@@ -72,6 +83,20 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <Footer />
             </div>
           </div>
+
+          <DragOverlay>
+            {draggedEntity && (
+              <div className="bg-white shadow-lg rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{draggedEntity.icon}</span>
+                  <div>
+                    <h3 className="font-medium">{draggedEntity.name}</h3>
+                    <p className="text-sm text-gray-500">{draggedEntity.type}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </DragOverlay>
         </div>
       </AssistantContext.Provider>
     </DndContext>

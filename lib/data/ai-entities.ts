@@ -6,35 +6,31 @@ export enum AIEntityStatus {
   DEPRECATED = 'deprecated'
 }
 
-export interface Assistant {
+interface BaseEntity {
   id: string;
-  type: 'assistant';
+  icon: string;
   name: string;
   description: string;
+  status?: AIEntityStatus;
+  statusMessage?: string;
+  order?: number;
   initial_prompt: string;
   guidance: string;
-  icon: string;
-  status: AIEntityStatus;
-  statusMessage?: string; // Optional message explaining the status
 }
 
-export interface Agent {
-  id: string;
-  type: 'agent';
-  name: string;
-  description: string;
-  initial_prompt: string;
-  guidance: string;
-  icon: string;
-  status: AIEntityStatus;
-  statusMessage?: string;
+export interface Assistant extends BaseEntity {
+  type: "assistant";
+}
+
+export interface Agent extends BaseEntity {
+  type: "agent";
 }
 
 export type AIEntity = Assistant | Agent;
 
 export const assistants: Assistant[] = [
   {
-    id: "recipe-helper",
+    id: "recipe-helper-assistant",
     type: "assistant",
     name: "Recipe Helper",
     description: "Provides recipes and cooking tips based on user input.",
@@ -55,7 +51,7 @@ export const assistants: Assistant[] = [
     statusMessage: "Currently in beta testing - may have limited functionality"
   },
   {
-    id: 'content-creation',
+    id: 'content-creation-assistant',
     type: "assistant",
     icon: '📝',
     name: 'Content Creation Assistant',
@@ -65,7 +61,7 @@ export const assistants: Assistant[] = [
     status: AIEntityStatus.ACTIVE
   },
   {
-    id: 'general-chat',
+    id: 'general-chat-assistant',
     type: "assistant",
     icon: '💭',
     name: 'General Chat Assistant',
@@ -75,7 +71,7 @@ export const assistants: Assistant[] = [
     status: AIEntityStatus.ACTIVE
   },
   {
-    id: 'task-specific',
+    id: 'task-specific-assistant',
     type: "assistant",
     icon: '🤖',
     name: 'Task Specific Assistant',

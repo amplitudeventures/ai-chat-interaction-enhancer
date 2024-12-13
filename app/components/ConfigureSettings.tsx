@@ -1,10 +1,12 @@
 'use client';
 
+import { useEffect, useState, useRef } from 'react';
 import Image from 'next/image';
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Check, ChevronsUpDown } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+import { AIEntity, assistants, agents } from '@/lib/data/ai-entities';
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -28,7 +30,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { assistants, type AIEntity } from '@/lib/data/ai-entities';
 
 const FormSchema = z.object({
   assistant: z.string({
@@ -36,14 +37,90 @@ const FormSchema = z.object({
   }),
 })
 
+interface Configuration {
+  id: string;
+  userId: string;
+  entityId: string;
+  entity: AIEntity;
+}
+
 export function ConfigureSettings() {
+  const [configuredEntities, setConfiguredEntities] = useState<AIEntity[]>([]);
+  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const initRef = useRef(false);
+
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
-  })
+  });
 
-  function onSubmit(data: z.infer<typeof FormSchema>) {
-    console.log(data)
-    // Handle form submission
+  // Fetch configurations from database
+  useEffect(() => {
+    if (initRef.current) return;
+    
+    const abortController = new AbortController();
+    
+    const fetchUserConfigurations = async () => {
+      setIsLoading(true);
+      setError(null);
+      
+      try {
+        const response = await fetch('/api/configurations', {
+          signal: abortController.signal,
+          cache: 'no-store'
+        });
+        
+        if (!response.ok) throw new Error('Failed to fetch configurations');
+        const { configurations } = await response.json();
+        
+        // Use the entities directly from the database response
+        const userEntities = configurations.map((config: Configuration) => config.entity);
+        
+        setConfiguredEntities(userEntities.sort((a: AIEntity, b: AIEntity) => (a.order || 0) - (b.order || 0)));
+        initRef.current = true;
+      } catch (error: unknown) {
+        if (error instanceof Error && error.name === 'AbortError') return;
+        console.error('Error loading configurations:', error);
+        setError('Failed to load configurations');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserConfigurations();
+
+    return () => {
+      abortController.abort();
+    };
+  }, []);
+
+  async function onSubmit(data: z.infer<typeof FormSchema>) {
+    try {
+      const response = await fetch('/api/configurations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          entities: [{ id: data.assistant }] // Match the expected format in the API
+        }),
+      });
+
+      if (!response.ok) throw new Error('Failed to save configuration');
+      const result = await response.json();
+
+      // Refresh the configurations list
+      initRef.current = false;
+      const newEntity = result.configurations[0].entity;
+      if (newEntity) {
+        setConfiguredEntities(prev => [...prev, newEntity]);
+      }
+      setIsPopoverOpen(false);
+    } catch (err) {
+      console.error('Error saving configuration:', err);
+      setError('Failed to save configuration');
+    }
   }
 
   return (
@@ -77,7 +154,7 @@ export function ConfigureSettings() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-white">Assistant Name</FormLabel>
-                        <Popover>
+                        <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
                               <Button
@@ -89,8 +166,8 @@ export function ConfigureSettings() {
                                 )}
                               >
                                 {field.value
-                                  ? assistants.find(
-                                      (assistant) => assistant.id === field.value
+                                  ? [...agents, ...assistants].find(
+                                      (entity) => entity.id === field.value
                                     )?.name
                                   : "Select assistant..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -101,32 +178,53 @@ export function ConfigureSettings() {
                             <Command>
                               <CommandInput placeholder="Search assistant..." />
                               <CommandList>
-                                <CommandEmpty>No assistant found.</CommandEmpty>
-                                <CommandGroup>
-                                  {assistants.map((assistant) => (
-                                    <CommandItem
-                                      value={assistant.name}
-                                      key={assistant.id}
-                                      onSelect={() => {
-                                        form.setValue("assistant", assistant.id)
-                                      }}
-                                    >
-                                      {assistant.name}
-                                      <Check
-                                        className={cn(
-                                          "ml-auto",
-                                          assistant.id === field.value
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        )}
-                                      />
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
+                                {isLoading ? (
+                                  <div className="p-4 text-center text-sm text-gray-500">
+                                    Loading configurations...
+                                  </div>
+                                ) : error ? (
+                                  <div className="p-4 text-center text-sm text-red-500">
+                                    {error}
+                                  </div>
+                                ) : (
+                                  <>
+                                    <CommandEmpty>No assistant found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {[...agents, ...assistants]
+                                        .filter(entity => !configuredEntities.some(configured => configured.id === entity.id))
+                                        .map((entity) => (
+                                          <CommandItem
+                                            value={entity.name}
+                                            key={entity.id}
+                                            onSelect={() => {
+                                              form.setValue("assistant", entity.id);
+                                              setIsPopoverOpen(false);
+                                            }}
+                                          >
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-xl">{entity.icon}</span>
+                                              <span>{entity.name}</span>
+                                            </div>
+                                            <Check
+                                              className={cn(
+                                                "ml-auto",
+                                                entity.id === field.value
+                                                  ? "opacity-100"
+                                                  : "opacity-0"
+                                              )}
+                                            />
+                                          </CommandItem>
+                                        ))}
+                                    </CommandGroup>
+                                  </>
+                                )}
                               </CommandList>
                             </Command>
                           </PopoverContent>
                         </Popover>
+                        {error && (
+                          <div className="text-red-500 text-sm mt-1">{error}</div>
+                        )}
                       </FormItem>
                     )}
                   />
@@ -146,7 +244,11 @@ export function ConfigureSettings() {
               </div>
 
               <div className="flex justify-center">
-                <Button type="submit" className="w-1/3 bg-[#1A1A1A]">
+                <Button 
+                  type="submit" 
+                  className="w-1/3 bg-[#1A1A1A]"
+                  disabled={isLoading}
+                >
                   Save
                 </Button>
               </div>

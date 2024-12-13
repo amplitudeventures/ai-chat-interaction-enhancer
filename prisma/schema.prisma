@@ -8,10 +8,55 @@ datasource db {
 }
 
 model User {
+  id              String              @id @default(cuid())
+  name            String?
+  email           String              @unique
+  password        String
+  configurations  UserConfiguration[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+}
+
+enum AIEntityStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+  BETA
+  DEPRECATED
+}
+
+enum EntityType {
+  ASSISTANT
+  AGENT
+}
+
+model AIEntity {
+  id              String              @id
+  type            EntityType
+  icon            String
+  name            String
+  description     String
+  status          AIEntityStatus      @default(ACTIVE)
+  statusMessage   String?
+  order           Int?
+  initialPrompt   String              @map("initial_prompt")
+  guidance        String
+  configurations  UserConfiguration[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@map("ai_entities")
+}
+
+model UserConfiguration {
   id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String
+  userId    String
+  entityId  String
+  entity    AIEntity @relation(fields: [entityId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@unique([userId, entityId])
+  @@map("user_configurations")
 } 

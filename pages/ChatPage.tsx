@@ -118,13 +118,19 @@ export default function ConsolePage() {
 
   // Handle agent selection
   const onSelectAgent = (id: string) => {
-    console.log("Selected Agent ID:", id);
     if (id === '') {
-      setSelectedAgent(null); // Deselect when empty string is passed
+      setSelectedAgents([]); // Clear all agents
     } else {
-      const agent = agents.find(a => a.id === id);  
+      const agent = agents.find(a => a.id === id);
       if (agent) {
-        setSelectedAgent(agent);
+        // Check if agent is already selected
+        if (selectedAgents.some(a => a.id === id)) {
+          // Remove agent if already selected
+          setSelectedAgents(selectedAgents.filter(a => a.id !== id));
+        } else {
+          // Add new agent to selected agents
+          setSelectedAgents([...selectedAgents, agent]);
+        }
       }
     }
   };
@@ -192,7 +198,7 @@ export default function ConsolePage() {
     }
     return false;
   });
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [selectedAgents, setSelectedAgents] = useState<Agent[]>([]);
   const [showEventLog, setShowEventLog] = useState(true);
 
   /**
@@ -253,36 +259,38 @@ export default function ConsolePage() {
       // Connect to realtime API
       await client.connect();
 
-      // Configure AI based on selected agent/assistant
-      if (selectedAgent) {
+      // Configure AI based on selected agents
+      if (selectedAgents.length > 0) {
         try {
-          const config = getChatConfig(selectedAgent.id);
-          
-          // Update session with entity-specific instructions
+          // Combine instructions from all selected agents
+          const combinedInstructions = selectedAgents.map(agent => {
+            const config = getChatConfig(agent.id);
+            return `${config.name}: ${config.description} ${config.initialPrompt}`;
+          }).join('\n\n');
+
+          // Update session with combined instructions
           await client.updateSession({ 
-            instructions: config.initialPrompt
+            instructions: `You are a multi-agent system with the following roles:\n${combinedInstructions}\n
+            When responding, clearly indicate which agent is speaking by prefixing responses with the agent's name.`
           });
 
-          // Send dynamic initialization message
-          const initializationMessage = `You are now ${config.name}. ${config.description} ${config.initialPrompt} Please introduce yourself and start helping according to your role.`;
+          // Send initialization message
+          const initializationMessage = `You are a multi-agent system consisting of: ${
+            selectedAgents.map(agent => agent.name).join(', ')
+          }. Each agent should introduce themselves and their role.`;
+          
           client.sendUserMessageContent([
             {
               type: 'input_text',
               text: initializationMessage
             }
           ]);
+
         } catch (error) {
-          console.error('Error configuring AI:', error);
-          // Fallback to default greeting
-          client.sendUserMessageContent([
-            {
-              type: 'input_text',
-              text: 'Hello! I am a general AI assistant. How can I help you today?'
-            }
-          ]);
+          console.error('Error configuring multi-agent AI:', error);
         }
       } else {
-        // No agent selected, use default greeting
+        // Default behavior when no agents selected
         client.sendUserMessageContent([
           {
             type: 'input_text',
@@ -298,7 +306,7 @@ export default function ConsolePage() {
       console.error('Connection error:', error);
       setIsConnected(false);
     }
-  }, []);
+  }, [selectedAgents]);
 
   /**
    * Disconnect and reset conversation state
@@ -590,30 +598,27 @@ export default function ConsolePage() {
     e.currentTarget.classList.remove('drag-over');
     
     try {
-        const agentData = JSON.parse(e.dataTransfer.getData('application/json'));
-        setSelectedAgent(agentData);
-
-        // Update the AI's instructions with your specific format
-        const client = clientRef.current;
-        const agentInstructions = `${agentData.description} this means the user know you as you expert in this area therefore when you start the conversation start by saying i am ia agent and my profession is ${agentData.name}, how can i help you with my profession`;
-
-        // Update the session with new instructions
-        client.updateSession({ 
-            instructions: agentInstructions 
-        });
-
-        // Send a message to introduce the agent with the new format
-        const introductionMessage = `I am ia agent and my profession is ${agentData.name}, how can I help you with my profession?`;
-        client.sendUserMessageContent([
-            { 
-                type: 'input_text', 
-                text: introductionMessage 
-            }
-        ]);
-
-        console.log('Agent persona activated:', agentData);
+      const agentData = JSON.parse(e.dataTransfer.getData('application/json'));
+      
+      // Check if agent is already selected
+      if (!selectedAgents.some(agent => agent.id === agentData.id)) {
+        setSelectedAgents([...selectedAgents, agentData]);
+        
+        // Update conversation with new agent if already connected
+        if (clientRef.current.isConnected()) {
+          const newAgentConfig = getChatConfig(agentData.id);
+          const combinedInstructions = selectedAgents.map(agent => {
+            const config = getChatConfig(agent.id);
+            return `${config.name}: ${config.description} ${config.initialPrompt}`;
+          }).join('\n\n');
+          
+          clientRef.current.updateSession({
+            instructions: `${combinedInstructions}\n\n${newAgentConfig.name}: ${newAgentConfig.description} ${newAgentConfig.initialPrompt}`
+          });
+        }
+      }
     } catch (error) {
-        console.error('Error parsing dropped agent data:', error);
+      console.error('Error parsing dropped agent data:', error);
     }
   };
 
@@ -683,19 +688,26 @@ return (
             onDrop={handleDrop}
           >
             <div className="flex flex-col flex-grow overflow-hidden ">
-              {selectedAgent && (
-                <div 
-                  className="p-3 bg-gray-50 border-b border-gray-200 cursor-move hover:bg-gray-100 dark:bg-gray-800 dark:border-gray-700 dark:hover:bg-gray-700"
-                  draggable
-                  onDragStart={(e) => {
-                    e.dataTransfer.setData('application/json', JSON.stringify(selectedAgent));
-                  }}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-500 font-medium">Selected Agent:</span>
-                    <span className="text-blue-500 font-semibold">{selectedAgent.name}</span>
-                    <span className="text-xs text-gray-400 ml-auto">(Drag to remove)</span>
-                  </div>
+              {selectedAgents.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-3 bg-gray-50 border-b border-gray-200 dark:bg-gray-800 dark:border-gray-700">
+                  {selectedAgents.map((agent) => (
+                    <div 
+                      key={agent.id}
+                      className="flex items-center gap-2 p-2 bg-white dark:bg-gray-700 rounded-lg shadow-sm"
+                      draggable
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('application/json', JSON.stringify(agent));
+                      }}
+                    >
+                      <span className="text-blue-500 font-semibold">{agent.name}</span>
+                      <button 
+                        onClick={() => onSelectAgent(agent.id)}
+                        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
               )}
 
@@ -768,7 +780,7 @@ return (
 
               <div className={`flex-shrink-0 transition-all duration-300 ${
                   showEventLog 
-                    ? 'h-[200px]' // Original height when events are shown
+                    ? 'h-[180px]' // Original height when events are shown
                     : 'h-[500px]' // Increased height (200px + 340px) when events are hidden
                 } border-t border-gray-200 dark:border-gray-700 flex flex-col`}
               >
@@ -870,7 +882,7 @@ return (
         <AIAgents 
           agents={agents} 
           onSelectAgent={onSelectAgent}
-          selectedAgentId={selectedAgent?.id} 
+          selectedAgentIds={selectedAgents.map(agent => agent.id)} 
         />
       </div>
     </div>

@@ -3,34 +3,24 @@ import { NextResponse } from 'next/server'
 
 export default withAuth(
   function middleware(req) {
-    // Always allow access to home page
-    if (req.nextUrl.pathname === '/') {
-      return null
-    }
-
-    const isAuthPage = req.nextUrl.pathname.startsWith('/login') || 
-                      req.nextUrl.pathname.startsWith('/register')
-
-    if (isAuthPage) {
-      if (req.nextauth.token) {
-        return NextResponse.redirect(new URL('/dashboard', req.url))
-      }
-      return null
-    }
-
-    // Protect other routes
-    if (!req.nextauth.token) {
-      return NextResponse.redirect(new URL('/login', req.url))
-    }
+    return NextResponse.next()
   },
   {
     callbacks: {
-      authorized: () => true // Let the middleware function handle the auth check
+      authorized: ({ token }) => !!token
+    },
+    pages: {
+      signIn: '/login'
     }
   }
 )
 
-// Simplify the matcher
 export const config = {
-  matcher: ['/dashboard/:path*', '/login', '/register']
+  matcher: [
+    // Add routes that need authentication
+    '/dashboard/:path*',
+    '/settings/:path*',
+    // Exclude chatcenter
+    '/((?!chatcenter|login|register|api|_next/static|_next/image|favicon.ico).*)'
+  ]
 }

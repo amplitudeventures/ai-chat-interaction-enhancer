@@ -1,14 +1,18 @@
+'use client'
+
 import React from 'react';
 import { ChevronDown } from 'react-feather';
 import { UserCircle2 } from 'lucide-react';
 
 interface InternalHeaderProps {
-  apiKey?: string;
-  resetAPIKey?: () => void;
+  apiKey: string;
+  resetAPIKey: () => void;
   isLocalRelay: boolean;
 }
 
 const InternalHeader: React.FC<InternalHeaderProps> = ({ apiKey, resetAPIKey, isLocalRelay }) => {
+  const displayText = isLocalRelay ? "Local" : "SK";
+  
   return (
     <header className="flex justify-between items-center pb-3 bg-[--bg-color] dark:bg-gray-800 border-b border-gray-100 mx-2">
       <div className="relative group">
@@ -41,16 +45,10 @@ const InternalHeader: React.FC<InternalHeaderProps> = ({ apiKey, resetAPIKey, is
       <div className="flex items-center gap-2">
         <div className="relative group">
           <button 
-            onClick={!isLocalRelay ? resetAPIKey : undefined}
-            className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 flex items-center justify-center transition-colors duration-200"
+            onClick={resetAPIKey}
+            className="w-10 h-10 text-center text-sm font-medium bg-[#7989FF] text-white rounded-full p-3"
           >
-            {!isLocalRelay ? (
-              <span className="w-10 h-10 text-center text-sm font-medium bg-[#7989FF] text-white rounded-full p-3">
-                {apiKey ? apiKey.slice(0, 2).toUpperCase() : 'API'}
-              </span>
-            ) : (
-              <span className="text-sm">Local</span>
-            )}
+            {displayText}
           </button>
           
           {!isLocalRelay && (

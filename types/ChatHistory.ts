@@ -6,5 +6,6 @@ export interface ChatHistory {
     preview: string;
     timeStamp?: string;
     model: string;
+    sender?: 'user' | 'assistant' | 'system';
     // Add other properties as needed
 }
