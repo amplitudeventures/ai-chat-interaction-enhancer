@@ -1,16 +1,14 @@
 'use client';
 
-import { signOut } from 'next-auth/react';
-import { useSession } from 'next-auth/react';
-import { DragEndEvent } from '@dnd-kit/core';
+import { signOut, useSession } from 'next-auth/react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { AssistantItem } from '../types/assistants';
 import { DraggableAssistant } from './DraggableAssistant';
 import { LogOut, User } from 'lucide-react';
+import { type AIEntity } from '@/lib/data/ai-entities';
 
 interface SidebarProps {
-  assistants: AssistantItem[];
-  setAssistants: (assistants: AssistantItem[]) => void;
+  assistants: AIEntity[];
+  setAssistants: (assistants: AIEntity[]) => void;
 }
 
 export default function Sidebar({ assistants, setAssistants }: SidebarProps) {
@@ -39,6 +37,8 @@ export default function Sidebar({ assistants, setAssistants }: SidebarProps) {
               icon={assistant.icon}
               name={assistant.name}
               description={assistant.description}
+              status={assistant.status}
+              statusMessage={assistant.statusMessage}
             />
           ))}
         </SortableContext>

@@ -1,12 +1,14 @@
 'use client';
 
 import { createContext } from 'react';
-import { AssistantItem } from '../types/assistants';
+import { type AIEntity } from '@/lib/data/ai-entities';
 
-export const AssistantContext = createContext<{
-  activeAssistants: AssistantItem[];
-  setActiveAssistants: (assistants: AssistantItem[]) => void;
-}>({
+interface AssistantContextType {
+  activeAssistants: AIEntity[];
+  setActiveAssistants: React.Dispatch<React.SetStateAction<AIEntity[]>>;
+}
+
+export const AssistantContext = createContext<AssistantContextType>({
   activeAssistants: [],
   setActiveAssistants: () => {},
 }); 

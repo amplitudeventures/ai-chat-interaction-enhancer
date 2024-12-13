@@ -1,13 +1,33 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 interface SelectAssistantsProps {
   selectedWorkflow: string;
   setSelectedWorkflow: (workflow: string) => void;
+  selectedAssistants: string[];
+  setSelectedAssistants: (assistants: string[]) => void;
 }
 
-export function SelectAssistants({ selectedWorkflow, setSelectedWorkflow }: SelectAssistantsProps) {
+export function SelectAssistants({ 
+  selectedWorkflow, 
+  setSelectedWorkflow,
+  selectedAssistants = [],
+  setSelectedAssistants 
+}: SelectAssistantsProps) {
+  const router = useRouter();
+
+  const handleSave = () => {
+    if (selectedAssistants?.length > 0) {
+      localStorage.setItem('selectedAssistants', JSON.stringify(selectedAssistants));
+      router.push('/chatcenter');
+    }
+  };
+
+  const isDisabled = !selectedAssistants || selectedAssistants.length === 0;
+
   return (
-    <section className="bg-[#1a1a1a] text-white p-8  rounded-b-2xl mb-8 w-full ">
+    <section className="bg-[#1a1a1a] text-white p-8 rounded-b-2xl mb-8 w-full">
       <h2 className="text-3xl font-semibold text-center pt-16 mb-8 max-w-[400px] mx-auto">Select and Configure Assistants</h2>
       <p className="text-center mt-2 mb-4">Organize assistants and agents for your workflows</p>
       
@@ -43,6 +63,8 @@ export function SelectAssistants({ selectedWorkflow, setSelectedWorkflow }: Sele
           Task Specific
         </button>
       </div>
+
+      {/*  */}
     </section>
   );
 } 

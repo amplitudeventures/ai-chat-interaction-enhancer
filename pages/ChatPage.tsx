@@ -47,6 +47,8 @@ import LeftChatHistory from '../components/chathistory/ChatHistory';
 import AIAgents from '../components/aiagents/AIAgents';
 import { mockChatHistory } from '../data/mockChatHistory';
 import { ChatHistory } from '../types/ChatHistory';
+import { AIEntity, agents  } from '@/lib/data/ai-entities';
+import { getChatConfig } from '@/lib/data/ai-entities';
 
 /**
  * Type for result from get_weather() function call
@@ -113,21 +115,14 @@ export default function ConsolePage() {
 
   const [history, setHistory] = React.useState<ChatHistory[]>(mockChatHistory);
 
-  const [agents, setAgents] = React.useState([
-    { id: "1", name: "Software Engineer", description: "A software engineer is a professional who designs, develops, and maintains software systems." },
-    { id: "2", name: "Data Scientist", description: "A data scientist is a professional who uses statistical and computational methods to analyze data and extract insights." },
-    { id: "3", name: "UX Designer", description: "A UX designer is a professional who designs user interfaces and experiences for software products." },
-    { id: "4", name: "Product Manager", description: "A product manager is a professional who oversees the development and marketing of software products." },
-    { id: "5", name: "Cybersecurity Analyst", description: "A cybersecurity analyst is a professional who protects software systems from cyber attacks." },
-  ]);
-  
+
   // Handle agent selection
   const onSelectAgent = (id: string) => {
     console.log("Selected Agent ID:", id);
     if (id === '') {
       setSelectedAgent(null); // Deselect when empty string is passed
     } else {
-      const agent = agents.find(a => a.id === id);
+      const agent = agents.find(a => a.id === id);  
       if (agent) {
         setSelectedAgent(agent);
       }
@@ -252,18 +247,49 @@ export default function ConsolePage() {
     // Connect to microphone
     await wavRecorder.begin();
 
-    // Connect to audio output
-    await wavStreamPlayer.connect();
+      // Connect to audio output
+      await wavStreamPlayer.connect();
 
-    // Connect to realtime API
-    await client.connect();
-    client.sendUserMessageContent([
-      {
-        type: `input_text`,
-        text: `Hello!`,
-        // text: `For testing purposes, I want you to list ten car brands. Number each item, e.g. "one (or whatever number you are one): the item name".`
-      },
-    ]);
+      // Connect to realtime API
+      await client.connect();
+
+      // Configure AI based on selected agent/assistant
+      if (selectedAgent) {
+        try {
+          const config = getChatConfig(selectedAgent.id);
+          
+          // Update session with entity-specific instructions
+          await client.updateSession({ 
+            instructions: config.initialPrompt
+          });
+
+          // Send dynamic initialization message
+          const initializationMessage = `You are now ${config.name}. ${config.description} ${config.initialPrompt} Please introduce yourself and start helping according to your role.`;
+          client.sendUserMessageContent([
+            {
+              type: 'input_text',
+              text: initializationMessage
+            }
+          ]);
+        } catch (error) {
+          console.error('Error configuring AI:', error);
+          // Fallback to default greeting
+          client.sendUserMessageContent([
+            {
+              type: 'input_text',
+              text: 'Hello! I am a general AI assistant. How can I help you today?'
+            }
+          ]);
+        }
+      } else {
+        // No agent selected, use default greeting
+        client.sendUserMessageContent([
+          {
+            type: 'input_text',
+            text: 'Hello! I am a general AI assistant. How can I help you today?'
+          }
+        ]);
+      }
 
       if (client.getTurnDetectionType() === 'server_vad') {
         await wavRecorder.record((data) => client.appendInputAudio(data.mono));
@@ -682,7 +708,7 @@ return (
                 <div 
                   ref={eventsScrollRef} 
                   className={`flex-1 overflow-y-auto transition-all duration-300 ${
-                    showEventLog ? 'max-h-[340px]' : 'max-h-[0px] overflow-hidden'
+                    showEventLog ? 'max-h-[320px]' : 'max-h-[0px] overflow-hidden'
                   }`}
                 >
                   {!realtimeEvents.length && (
@@ -743,7 +769,7 @@ return (
               <div className={`flex-shrink-0 transition-all duration-300 ${
                   showEventLog 
                     ? 'h-[200px]' // Original height when events are shown
-                    : 'h-[560px]' // Increased height (200px + 340px) when events are hidden
+                    : 'h-[500px]' // Increased height (200px + 340px) when events are hidden
                 } border-t border-gray-200 dark:border-gray-700 flex flex-col`}
               >
                 <div className="text-base pt-4 pb-1">conversation</div>
