@@ -2,7 +2,16 @@
 
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { AssistantItem } from '../types/assistants';
+import { AIEntityStatus } from '@/lib/data/ai-entities';
+
+interface AssistantItem {
+  id: string;
+  icon: string;
+  name: string;
+  description: string;
+  status: AIEntityStatus;
+  statusMessage?: string;
+}
 
 export function DraggableAssistant(props: AssistantItem) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({

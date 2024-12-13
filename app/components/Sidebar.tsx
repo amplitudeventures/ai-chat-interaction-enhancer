@@ -1,20 +1,25 @@
 'use client';
 
-import { signOut } from 'next-auth/react';
-import { useSession } from 'next-auth/react';
-import { DragEndEvent } from '@dnd-kit/core';
+import { signOut, useSession } from 'next-auth/react';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
-import { AssistantItem } from '../types/assistants';
 import { DraggableAssistant } from './DraggableAssistant';
 import { LogOut, User } from 'lucide-react';
+import { type AIEntity } from '@/lib/data/ai-entities';
 
 interface SidebarProps {
-  assistants: AssistantItem[];
-  setAssistants: (assistants: AssistantItem[]) => void;
+  assistants: AIEntity[];
+  setAssistants: (assistants: AIEntity[]) => void;
 }
 
 export default function Sidebar({ assistants, setAssistants }: SidebarProps) {
   const { data: session } = useSession();
+
+  const handleLogout = async () => {
+    if (window.confirm('Are you sure you want to logout?')) {
+      await signOut({ redirect: false });
+      window.location.href = '/';
+    }
+  };
 
   return (
     <div className="w-64 bg-[#1a1a1a] min-h-screen p-4 flex flex-col">
@@ -32,6 +37,8 @@ export default function Sidebar({ assistants, setAssistants }: SidebarProps) {
               icon={assistant.icon}
               name={assistant.name}
               description={assistant.description}
+              status={assistant.status}
+              statusMessage={assistant.statusMessage}
             />
           ))}
         </SortableContext>
@@ -44,10 +51,7 @@ export default function Sidebar({ assistants, setAssistants }: SidebarProps) {
             <span>{session?.user?.name || session?.user?.email}</span>
           </div>
           <button 
-            onClick={async () => {
-              await signOut({ redirect: false });
-              window.location.href = '/';
-            }}
+            onClick={handleLogout}
             className="p-2 hover:bg-gray-700 rounded-full transition-colors"
           >
             <LogOut size={20} />

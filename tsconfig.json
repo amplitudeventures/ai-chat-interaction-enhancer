@@ -16,6 +16,15 @@
     "plugins": [
       {
         "name": "next"
+      },
+      {
+        "name": "tailwindcss-animate"
+      },
+      {
+        "name": "tailwind-scrollbar",
+        "options": {
+          "nocompatible": true
+        }
       }
     ],
     "paths": {
