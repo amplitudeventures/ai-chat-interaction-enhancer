@@ -41,6 +41,7 @@ import { Toggle as ToggleButton } from '@/components/toggle/Toggle';
 import {Toggle as Toggle} from "@/components/ui/toggle"
 import { ToggleLeft, ToggleRight } from "lucide-react"
 import { ChevronDown, ChevronUp } from 'lucide-react'
+import { Mic, MessageSquare } from 'lucide-react'
 
 import InternalHeader from '../components/internalheader/InternalHeader';
 import LeftChatHistory from '../components/chathistory/ChatHistory';
@@ -49,6 +50,11 @@ import { mockChatHistory } from '../data/mockChatHistory';
 import { ChatHistory } from '../types/ChatHistory';
 import { AIEntity, agents  } from '@/lib/data/ai-entities';
 import { getChatConfig } from '@/lib/data/ai-entities';
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Input } from "@/components/ui/input"
+import { Button  as ButtonComponent} from "@/components/ui/button"
+import { TextInput } from "@/components/TextInput"
+import { Message } from "@/components/Message"
 
 /**
  * Type for result from get_weather() function call
@@ -200,6 +206,7 @@ export default function ConsolePage() {
   });
   const [selectedAgents, setSelectedAgents] = useState<Agent[]>([]);
   const [showEventLog, setShowEventLog] = useState(true);
+  const [communicationMode, setCommunicationMode] = useState<'text' | 'voice'>('text');
 
   /**
    * Utility for formatting the timing of logs
@@ -241,72 +248,51 @@ export default function ConsolePage() {
   const connectConversation = useCallback(async () => {
     try {
       const client = clientRef.current;
-      const wavRecorder = wavRecorderRef.current;
-      const wavStreamPlayer = wavStreamPlayerRef.current;
-
-    // Set state variables
-    startTimeRef.current = new Date().toISOString();
-    setIsConnected(true);
-    setRealtimeEvents([]);
-    setItems(client.conversation.getItems());
-
-    // Connect to microphone
-    await wavRecorder.begin();
-
-      // Connect to audio output
-      await wavStreamPlayer.connect();
+      
+      // Set basic state variables
+      startTimeRef.current = new Date().toISOString();
+      setIsConnected(true);
+      setRealtimeEvents([]);
+      setItems(client.conversation.getItems());
 
       // Connect to realtime API
       await client.connect();
 
-      // Configure AI based on selected agents
-      if (selectedAgents.length > 0) {
-        try {
-          // Combine instructions from all selected agents
-          const combinedInstructions = selectedAgents.map(agent => {
-            const config = getChatConfig(agent.id);
-            return `${config.name}: ${config.description} ${config.initialPrompt}`;
-          }).join('\n\n');
+      // Update session based on mode
+      await client.updateSession({ 
+        input_audio_transcription: communicationMode === 'voice' ? { model: 'whisper-1' } : null,
+        output_audio_encoding: communicationMode === 'voice' ? { model: 'tts-1' } : null
+      });
 
-          // Update session with combined instructions
-          await client.updateSession({ 
-            instructions: `You are a multi-agent system with the following roles:\n${combinedInstructions}\n
-            When responding, clearly indicate which agent is speaking by prefixing responses with the agent's name.`
-          });
-
-          // Send initialization message
-          const initializationMessage = `You are a multi-agent system consisting of: ${
-            selectedAgents.map(agent => agent.name).join(', ')
-          }. Each agent should introduce themselves and their role.`;
-          
-          client.sendUserMessageContent([
-            {
-              type: 'input_text',
-              text: initializationMessage
-            }
-          ]);
-
-        } catch (error) {
-          console.error('Error configuring multi-agent AI:', error);
-        }
-      } else {
-        // Default behavior when no agents selected
-        client.sendUserMessageContent([
-          {
-            type: 'input_text',
-            text: 'Hello! I am a general AI assistant. How can I help you today?'
-          }
-        ]);
+      // Only initialize audio components in voice mode
+      if (communicationMode === 'voice') {
+        const wavRecorder = wavRecorderRef.current;
+        const wavStreamPlayer = wavStreamPlayerRef.current;
+        await wavRecorder.begin();
+        await wavStreamPlayer.connect();
       }
 
-      if (client.getTurnDetectionType() === 'server_vad') {
+      // Send initial message based on mode and agents
+      const initialMessage = selectedAgents.length > 0
+        ? `You are a multi-agent system consisting of: ${selectedAgents.map(agent => agent.name).join(', ')}. Combine your knowledge to answer the user's question.`
+        : 'Hello! i want who you are?';
+
+      await client.sendUserMessageContent([{
+        type: 'input_text',
+        text: initialMessage
+      }]);
+
+      // Only setup voice recording if in voice mode
+      if (communicationMode === 'voice' && client.getTurnDetectionType() === 'server_vad') {
+        const wavRecorder = wavRecorderRef.current;
         await wavRecorder.record((data) => client.appendInputAudio(data.mono));
       }
+
     } catch (error) {
       console.error('Connection error:', error);
       setIsConnected(false);
     }
-  }, [selectedAgents]);
+  }, [selectedAgents, communicationMode]);
 
   /**
    * Disconnect and reset conversation state
@@ -554,10 +540,10 @@ export default function ConsolePage() {
     });
     client.on('conversation.updated', async ({ item, delta }: any) => {
       const items = client.conversation.getItems();
-      if (delta?.audio) {
+      if (communicationMode === 'voice' && delta?.audio) {
         wavStreamPlayer.add16BitPCM(delta.audio, item.id);
       }
-      if (item.status === 'completed' && item.formatted.audio?.length) {
+      if (item.status === 'completed' && item.formatted.audio?.length && communicationMode === 'voice') {
         const wavFile = await WavRecorder.decode(
           item.formatted.audio,
           24000,
@@ -574,7 +560,7 @@ export default function ConsolePage() {
       // cleanup; resets to defaults
       client.reset();
     };
-  }, []);
+  }, [communicationMode]);
 
   const toggleTheme = useCallback(() => {
     setIsDarkMode(prev => !prev);
@@ -657,10 +643,40 @@ export default function ConsolePage() {
     </button>
   );
 
+  const sendTextMessage = async (message: string) => {
+    if (!clientRef.current.isConnected()) {
+      console.error('Client not connected');
+      return;
+    }
+
+    try {
+      await clientRef.current.sendUserMessageContent([
+        {
+          type: 'input_text',
+          text: message
+        }
+      ]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
+  };
+
   /**
    * Render the application
    */
   //
+
+  // Add connection state check
+  const ensureConnection = async () => {
+    if (!clientRef.current.isConnected()) {
+      try {
+        await clientRef.current.connect();
+        setIsConnected(true);
+      } catch (error) {
+        console.error('Reconnection failed:', error);
+      }
+    }
+  };
 
 return (
   <div className="h-full flex  flex-col overflow-hidden mx-2 bg-white text-zinc-900 dark:bg-zinc-900 dark:text-zinc-100 font-sans text-base">
@@ -785,92 +801,119 @@ return (
                 } border-t border-gray-200 dark:border-gray-700 flex flex-col`}
               >
                 <div className="text-base pt-4 pb-1">conversation</div>
-                <div className="flex-1 overflow-y-auto" data-conversation-content>
-                  {!items.length && (
-                    <div className="text-gray-500">awaiting connection...</div>
-                  )}
-                  {items.map((conversationItem) => (
-                    <div key={conversationItem.id} className="relative flex gap-4 mb-4">
-                      <div className={`text-left w-20 flex-shrink-0 mr-4 
-                        ${conversationItem.role === 'user' ? 'text-blue-500' : 'text-green-600'}`}>
-                        <div>
-                          {(conversationItem.role || conversationItem.type).replaceAll('_', ' ')}
-                        </div>
-                        <div
-                          className="absolute top-0 right-[-20px] bg-gray-400 text-white  rounded-full p-0.5 cursor-pointer hover:bg-gray-600 hidden group-hover:flex"
-                          onClick={() => deleteConversationItem(conversationItem.id)}
-                        >
-                          <X className="w-3 h-3 stroke-[3]" />
-                        </div>
+                <ScrollArea className="flex-1">
+                  <div className="flex flex-col gap-2 p-4">
+                    {!items.length && (
+                      <div className="text-center text-gray-500">
+                        Start a conversation...
                       </div>
-                      <div className="text-zinc-900 dark:text-zinc-100 overflow-hidden break-words">
-                        {conversationItem.type === 'function_call_output' && (
-                          <div>{conversationItem.formatted.output}</div>
-                        )}
-                        {!!conversationItem.formatted.tool && (
-                          <div>
-                            {conversationItem.formatted.tool.name}(
-                            {conversationItem.formatted.tool.arguments})
-                          </div>
-                        )}
-                        {!conversationItem.formatted.tool && conversationItem.role === 'user' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              (conversationItem.formatted.audio?.length
-                                ? '(awaiting transcript)'
-                                : conversationItem.formatted.text ||
-                                '(item sent)')}
-                          </div>
-                        )}
-                        {!conversationItem.formatted.tool && conversationItem.role === 'assistant' && (
-                          <div>
-                            {conversationItem.formatted.transcript ||
-                              conversationItem.formatted.text ||
-                              '(truncated)'}
-                          </div>
-                        )}
-                        {conversationItem.formatted.file && (
-                          <audio
-                            src={conversationItem.formatted.file.url}
-                            controls
-                            className="mt-2"
-                          />
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                    {items.map((item) => (
+                      <Message
+                        key={item.id}
+                        role={item.role || 'assistant'}
+                        content={
+                          item.formatted.transcript ||
+                          item.formatted.text ||
+                          (item.formatted.audio?.length ? '(processing audio...)' : '')
+                        }
+                      />
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
 
-              <div className="flex items-center justify-center gap-4 py-4">
-                <ToggleButton
-                  defaultValue={false}
-                  labels={['manual', 'vad']}
-                  values={['none', 'server_vad']}
-                  onChange={(_, value) => changeTurnEndType(value)}
-                />
+              <div className="flex flex-col gap-4 p-2 border-t border-gray-200 dark:border-gray-700 mb-20">
+                <div className="flex items-center justify-between mb-4">
+                  <Toggle 
+                    pressed={communicationMode === 'voice'}
+                    onPressedChange={async (pressed) => {
+                      setCommunicationMode(pressed ? 'voice' : 'text');
+                      
+                      try {
+                        // Ensure connection is maintained
+                        await ensureConnection();
 
-                <div className="flex-grow" />
+                        // Update session config
+                        await clientRef.current.updateSession({ 
+                          input_audio_transcription: pressed ? { model: 'whisper-1' } : null,
+                          output_audio_encoding: pressed ? { model: 'tts-1' } : null
+                        });
 
-                {isConnected && canPushToTalk && (
-                  <Button
-                    label={isRecording ? 'release to send' : 'push to talk'}
-                    buttonStyle={isRecording ? 'alert' : 'regular'}
-                    disabled={!isConnected || !canPushToTalk}
-                    onMouseDown={startRecording}
-                    onMouseUp={stopRecording}
-                  />
+                        // Handle audio components
+                        if (pressed) {
+                          await wavRecorderRef.current.begin();
+                          await wavStreamPlayerRef.current.connect();
+                        } else {
+                          await wavRecorderRef.current.end();
+                          await wavStreamPlayerRef.current.interrupt();
+                        }
+                      } catch (error) {
+                        console.error('Error switching modes:', error);
+                      }
+                    }}
+                    className={`flex items-center gap-2 px-4 py-2 ${
+                      communicationMode === 'voice' 
+                        ? 'bg-blue-100 text-blue-700 hover:bg-blue-200' 
+                        : 'bg-green-100 text-green-700 hover:bg-green-200'
+                    }`}
+                  >
+                    {communicationMode === 'voice' ? (
+                      <div className="flex items-center gap-2">
+                        <Mic className="h-4 w-4" />
+                        <span>Voice Mode Active</span>
+                        <ToggleRight className="h-4 w-4 ml-2" />
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        <span>Text Mode Active</span>
+                        <ToggleLeft className="h-4 w-4 ml-2" />
+                      </div>
+                    )}
+                  </Toggle>
+
+                  <ButtonComponent
+                    className="rounded-full"
+                    variant={isConnected ? "outline" : "default"}
+                    onClick={isConnected ? disconnectConversation : connectConversation}
+                  >
+                    {isConnected ? 'Disconnect' : 'Connect'}
+                    {isConnected ? <X className="ml-2 h-4 w-4" /> : <Zap className="ml-2 h-4 w-4" />}
+                  </ButtonComponent>
+                </div>
+
+                {/* Controls with fixed bottom margin */}
+                {communicationMode === 'voice' ? (
+                  <div className="flex items-center justify-center gap-4">
+                    <ToggleButton
+                      defaultValue={false}
+                      labels={['manual', 'vad']}
+                      values={['none', 'server_vad']}
+                      onChange={(_, value) => changeTurnEndType(value)}
+                      
+                    />
+
+                    {isConnected && canPushToTalk && (
+                      <ButtonComponent
+                        variant={isRecording ? "destructive" : "secondary"}
+                        disabled={!isConnected || !canPushToTalk}
+                        onMouseDown={startRecording}
+                        onMouseUp={stopRecording}
+                        className="rounded-full"
+                      >
+                        {isRecording ? 'Release to send' : 'Push to talk'}
+                      </ButtonComponent>
+                    )}
+                  </div>
+                ) : (
+                  <div className="fixed bottom-4 left-0 right-0 px-4 max-w-[740px] mx-auto">
+                    <TextInput 
+                      onSendMessage={sendTextMessage}
+                      disabled={!isConnected}
+                    />
+                  </div>
                 )}
-
-                <div className="flex-grow" />
-
-                <Button
-                  label={isConnected ? 'disconnect' : 'connect'}
-                  iconPosition={isConnected ? 'end' : 'start'}
-                  icon={isConnected ? X : Zap}
-                  buttonStyle={isConnected ? 'regular' : 'action'}
-                  onClick={isConnected ? disconnectConversation : connectConversation}
-                />
               </div>
             </div>
           </div>

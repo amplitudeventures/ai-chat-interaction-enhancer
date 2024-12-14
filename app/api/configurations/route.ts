@@ -4,11 +4,21 @@ import { authOptions } from '@/app/api/auth/auth-config'
 import { assistants, agents } from '@/lib/data/ai-entities';
 import { EntityType, AIEntityStatus } from '@prisma/client';
 
+// Add type for session
+interface SessionUser {
+  user: {
+    id: string;
+    email: string;
+    name?: string;
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions)
+    const session = await getServerSession(authOptions) as SessionUser | null
     
-    if (!session?.user?.email || !session?.user?.id) {
+    if (!session?.user?.id) {
+      console.log('No valid session found:', session)
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401,
         headers: { 'Content-Type': 'application/json' }
@@ -95,7 +105,8 @@ export async function GET() {
   try {
     const session = await getServerSession(authOptions)
     
-    if (!session?.user?.email || !session?.user?.id) {
+    if (!session) {
+      console.log('No session found:', session)
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { 
         status: 401,
         headers: { 'Content-Type': 'application/json' }

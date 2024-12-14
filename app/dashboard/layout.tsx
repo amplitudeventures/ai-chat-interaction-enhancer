@@ -57,7 +57,7 @@ function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
               <div className="max-w-7xl mx-auto flex justify-between items-center">
                 <h1 className="text-2xl font-bold">AI and Assistants Dashboard</h1>
                 <nav className="flex gap-4 items-center">
-                  <a href="#" className="hover:text-gray-300">Home</a>
+                  <a href="/chatcenter" className="hover:text-gray-300"> Chat </a>
                   <a href="#" className="hover:text-gray-300">Workflows</a>
                   <a href="#" className="hover:text-gray-300">Settings</a>
                   <div className="relative">
